@@ -21,6 +21,10 @@ typedef struct cmd_buff
     int  argc;
     char *argv[CMD_ARGV_MAX];
     char *_cmd_buffer;
+
+    char *output_file;  // Stores output redirection filename
+    int append_mode;    // 1 for append mode, 0 for truncate mode
+
 } cmd_buff_t;
 
 /* WIP - Move to next assignment 
