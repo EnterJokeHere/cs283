@@ -81,7 +81,7 @@
  #include <fcntl.h>
  #include <sys/wait.h>
  #include "dshlib.h"
- #include "dragon.c"
+ //include "dragon.c"
  
  #include <errno.h>
  
@@ -354,9 +354,6 @@
                       perror("cd");
                   }
               }
-              return BI_EXECUTED;
-          case BI_CMD_DRAGON:
-              print_dragon();
               return BI_EXECUTED;
           default:
               return BI_NOT_BI;

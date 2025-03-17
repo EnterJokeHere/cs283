@@ -57,13 +57,9 @@ int start_server(char *ifaces, int port, int is_threaded){
 
     svr_socket = boot_server(ifaces, port);
     if (svr_socket < 0){
-        int err_code = svr_socket;  //server socket will carry error code
+        int err_code = svr_socket;  // boot_server() returns error code on failure
         return err_code;
-        }
-        free(io_buff);
-        return rc;
     }
-
     rc = process_cli_requests(svr_socket);
 
     stop_server(svr_socket);
@@ -119,9 +115,9 @@ int stop_server(int svr_socket){
  */
 int boot_server(char *ifaces, int port){
     int svr_socket;
-    int ret;
-    
     struct sockaddr_in addr;
+    int enable = 1;
+    int ret;
 
     //  set up the socket - this is very similar to the demo code
     svr_socket = socket(AF_INET, SOCK_STREAM, 0);
@@ -129,7 +125,6 @@ int boot_server(char *ifaces, int port){
         perror("socket");
             return ERR_RDSH_COMMUNICATION;
         }
-    }
 
     setsockopt(svr_socket, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int));
 
@@ -139,6 +134,7 @@ int boot_server(char *ifaces, int port){
     addr.sin_addr.s_addr = inet_addr(ifaces); // Convert IP from string
     addr.sin_port = htons(port); // Convert to network byte order
     
+
     // Bind the socket to the interface and port
     if (bind(svr_socket, (struct sockaddr *)&addr, sizeof(addr)) == -1) {
         perror("bind");
@@ -153,12 +149,12 @@ int boot_server(char *ifaces, int port){
      * to 20. So while one request is being processed other requests
      * can be waiting.
      */
-    ret = listen(svr_socket, 20);
-    if (ret == -1) {
+    if (listen(svr_socket, 20) == -1) {
         perror("listen");
+        close(svr_socket);
         return ERR_RDSH_COMMUNICATION;
     }
-
+    
     return svr_socket;
 }
 
@@ -272,33 +268,18 @@ int process_cli_requests(int svr_socket){
  *      ERR_RDSH_COMMUNICATION:  A catch all for any socket() related send
  *                or receive errors. 
  */
-int exec_client_requests(int cli_socket) {
+ int exec_client_requests(int cli_socket) {
+    char *io_buff;
     int io_size;
     command_list_t cmd_list;
     int rc;
-    int cmd_rc;
-    int last_rc;
-    char *io_buff;
 
     io_buff = malloc(RDSH_COMM_BUFF_SZ);
-    if (io_buff == NULL){
+    if (!io_buff) {
         return ERR_RDSH_SERVER;
     }
 
-    while(1) {
-        //   use recv() syscall to get input
-
-        //   build up a cmd_list
-
-        //   rsh_execute_pipeline to run your cmd_list
-
-        //   send appropriate respones with send_message_string
-        // - error constants for failures
-        // - buffer contents from execute commands
-        //  - etc.
-
-        //   send_message_eof when done
-
+    while (1) {
         memset(io_buff, 0, RDSH_COMM_BUFF_SZ);
         memset(&cmd_list, 0, sizeof(command_list_t));
 
@@ -306,19 +287,6 @@ int exec_client_requests(int cli_socket) {
         if (io_size <= 0) {
             free(io_buff);
             return ERR_RDSH_COMMUNICATION;
-        }
-
-        if (strcmp(io_buff, "exit") == 0) {
-            free(io_buff);
-            return OK;
-        } else if (strcmp(io_buff, "stop-server") == 0) {
-            free(io_buff);
-            return OK_EXIT;
-        }
-
-        rc = build_cmd_list(io_buff, &cmd_list);
-        if (rc < 0 || cmd_list.num <= 0) {
-            fprintf(stderr,
         }
 
         if (strcmp(io_buff, "exit") == 0) {
@@ -341,6 +309,8 @@ int exec_client_requests(int cli_socket) {
                 send_message_string(cli_socket, "[ERROR] cd: Missing directory\n");
                 continue;
             }
+
+           
             if (chdir(cmd_list.commands[0].argv[1]) != 0) {
                 perror("[ERROR] cd failed");
                 send_message_string(cli_socket, "[ERROR] cd failed\n");
@@ -350,22 +320,22 @@ int exec_client_requests(int cli_socket) {
 
             continue;  
         }
+
         
         rc = rsh_execute_pipeline(cli_socket, &cmd_list);
-        
         send_message_eof(cli_socket);
+
         if (rc != OK) {
             fprintf(stderr, "[ERROR] Communication issue: Unable to send EOF\n");
             free(io_buff);
             close(cli_socket);
             return ERR_RDSH_COMMUNICATION;
-        }
-    } // end of while loop
-    
+    }
+
     free(io_buff);
     return rc;
+    }
 }
-
 
 
 /*
@@ -468,6 +438,7 @@ int rsh_execute_pipeline(int cli_sock, command_list_t *clist) {
     
     int pipes[clist->num - 1][2];  // Array of pipes
     pid_t pids[clist->num];
+    int pids_st[clist->num];  // Declare the status array
     int exit_code;
 
     // Create all necessary pipes
@@ -618,9 +589,7 @@ Built_In_Cmds rsh_built_in_cmd(cmd_buff_t *cmd)
 
     switch (ctype)
     {
-    // case BI_CMD_DRAGON:
-    //     print_dragon();
-    //     return BI_EXECUTED;
+        // couldn't get dragon to work
     case BI_CMD_EXIT:
         return BI_CMD_EXIT;
     case BI_CMD_STOP_SVR:

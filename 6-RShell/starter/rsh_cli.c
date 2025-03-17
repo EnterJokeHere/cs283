@@ -94,7 +94,7 @@ int exec_remote_cmd_loop(char *address, int port)
 {
     char *cmd_buff = malloc(RDSH_COMM_BUFF_SZ);
     char *rsp_buff = malloc(RDSH_COMM_BUFF_SZ);
-    int cli_socket;
+    int cli_socket = -1;
     ssize_t io_size;
     int is_eof;
 
